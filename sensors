@@ -1,0 +1,440 @@
+#!/bin/bash
+#=======================================================================
+#
+#          FILE:  sensors
+#				  bash-script for Openmediavault
+# 
+#         USAGE:  install it with install.sh
+# 
+#   DESCRIPTION:  it creates
+# 
+#        AUTHOR:  Solo0815, thx to all Users of the OMV-Forums,
+#                 who added sample rrd-scripts
+#                 feel free to edit this file, but please share it in
+#                 the OMV-Forum:
+#                 http://forums.openmediavault.org/viewtopic.php?f=13&t=79#p244
+#       VERSION:  0.1
+#=======================================================================
+
+# Todo:
+# - bug testing
+
+set -e
+
+. /etc/default/openmediavault
+. /usr/share/openmediavault/scripts/helper-functions
+
+OMV_COLLECTD_CONFIG=${OMV_COLLECTD_CONFIG:-"/etc/collectd/collectd.conf"}
+OMV_COLLECTD_RRDTOOL_MKGRAPH=${OMV_COLLECTD_RRDTOOL_MKGRAPH:-"/usr/sbin/omv-mkgraph"}
+OMV_JSFILE_CONFIGDIR="/var/www/openmediavault/js/omv/module/admin"
+
+# simple log-function
+_log() {
+			[[ "$*" =~ ^([A-Za-z]*):\ (.*) ]] && 
+			{
+			PRIORITY=${BASH_REMATCH[1]}
+			LOGMESSAGE=${BASH_REMATCH[2]}
+			[[ "$(basename "$0")" =~ ^([A-Za-z]*) ]] &&
+			LOGMESSAGE="${BASH_REMATCH[1]}[$$]: $PRIORITY: '$LOGMESSAGE'";
+			logger -p local6.$PRIORITY "$LOGMESSAGE"
+			echo "$LOGMESSAGE"
+			echo "# $(date '+%b %e %H:%M:%S') - $LOGMESSAGE" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+			}
+}
+
+# Begin sensors section in /usr/sbin/omv-mkgraph
+f_begin_section() {
+	echo -e "# <<< [openmediavault] sensors-script" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+}
+
+# End sensors section in /usr/sbin/omv-mkgraph
+f_end_section() {
+	echo "# >>> [openmediavault] sensors-script" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+}
+
+# Add "LoadPlugin sensors" to /etc/collectd/collectd.conf
+f_sensors_load() {
+	if ! egrep "^LoadPlugin sensors" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
+		echo -e "LoadPlugin sensors\n\n" >> ${OMV_COLLECTD_CONFIG}
+	fi
+}
+
+# Add "LoadPlugin fanspeed" to /etc/collectd/collectd.conf
+f_fanspeed_load() {
+	if ! egrep "^LoadPlugin fanspeed" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
+		echo -e "LoadPlugin fanspeed\n\n" >> ${OMV_COLLECTD_CONFIG}
+	fi
+}
+
+
+# hedader for sensors section in /usr/sbin/omv-mkgraph
+f_plugin_sensors_header() {
+cat <<EOF >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+# Plugin: sensors
+TITLE_LOAD="CPU temperature"
+COLOR_CPU_CORE_0="#0000fd" # blue
+COLOR_CPU_CORE_1="#ff0000" # red
+
+EOF
+}
+
+# hedader for fanspeed section in /usr/sbin/omv-mkgraph
+f_plugin_fanspeed_header() {
+cat <<EOF >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+# Plugin: fanspeed
+TITLE_LOAD="Fan Speed"
+COLOR_FANSPEED="#00cc00" # green
+
+EOF
+}
+
+# rrdtool script for fanspeed
+f_fanspeedrrd() {
+cat <<EOF >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+rrdtool graph \${IMGDIR}/fanspeed-hour.png --start \${HOURSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${HOURTITLE}" --slope-mode --upper-limit 2000 --lower-limit 0 --units-exponent 0 \
+DEF:fan1avg=\${DATA}/$FANSPEED:value:AVERAGE \
+DEF:fan1pmin=\${DATA}/$FANSPEED:value:MIN \
+DEF:fan1pmax=\${DATA}/$FANSPEED:value:MAX \
+LINE1:fan1avg\${COLOR_FANSPEED}:"Fan Speed" \
+GPRINT:fan1pmin:MIN:"%4.2lf Min" \
+GPRINT:fan1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:fan1pmax:MAX:"%4.2lf Max" \
+GPRINT:fan1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/fanspeed-day.png --start \${DAYSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${DAYTITLE}" --slope-mode --upper-limit 2000 --lower-limit 0 --units-exponent 0 \
+DEF:fan1avg=\${DATA}/$FANSPEED:value:AVERAGE \
+DEF:fan1pmin=\${DATA}/$FANSPEED:value:MIN \
+DEF:fan1pmax=\${DATA}/$FANSPEED:value:MAX \
+LINE1:fan1avg\${COLOR_FANSPEED}:"Fan Speed" \
+GPRINT:fan1pmin:MIN:"%4.2lf Min" \
+GPRINT:fan1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:fan1pmax:MAX:"%4.2lf Max" \
+GPRINT:fan1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/fanspeed-week.png --start \${WEEKSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${WEEKTITLE}" --slope-mode --upper-limit 2000 --lower-limit 0 --units-exponent 0 \
+DEF:fan1avg=\${DATA}/$FANSPEED:value:AVERAGE \
+DEF:fan1pmin=\${DATA}/$FANSPEED:value:MIN \
+DEF:fan1pmax=\${DATA}/$FANSPEED:value:MAX \
+LINE1:fan1avg\${COLOR_FANSPEED}:"Fan Speed" \
+GPRINT:fan1pmin:MIN:"%4.2lf Min" \
+GPRINT:fan1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:fan1pmax:MAX:"%4.2lf Max" \
+GPRINT:fan1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/fanspeed-month.png --start \${MONTHSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${MONTHTITLE}" --slope-mode --upper-limit 2000 --lower-limit 0 --units-exponent 0 \
+DEF:fan1avg=\${DATA}/$FANSPEED:value:AVERAGE \
+DEF:fan1pmin=\${DATA}/$FANSPEED:value:MIN \
+DEF:fan1pmax=\${DATA}/$FANSPEED:value:MAX \
+LINE1:fan1avg\${COLOR_FANSPEED}:"Fan Speed" \
+GPRINT:fan1pmin:MIN:"%4.2lf Min" \
+GPRINT:fan1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:fan1pmax:MAX:"%4.2lf Max" \
+GPRINT:fan1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/fanspeed-year.png --start \${YEARSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${YEARTITLE}" --slope-mode --upper-limit 2000 --lower-limit 0 --units-exponent 0 \
+DEF:fan1avg=\${DATA}/$FANSPEED:value:AVERAGE \
+DEF:fan1pmin=\${DATA}/$FANSPEED:value:MIN \
+DEF:fan1pmax=\${DATA}/$FANSPEED:value:MAX \
+LINE1:fan1avg\${COLOR_FANSPEED}:"Fan Speed" \
+GPRINT:fan1pmin:MIN:"%4.2lf Min" \
+GPRINT:fan1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:fan1pmax:MAX:"%4.2lf Max" \
+GPRINT:fan1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+
+EOF
+}
+
+# rrdtool script for one sensor
+f_one_sensorrrd() {
+cat <<EOF >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+rrdtool graph \${IMGDIR}/sensors-hour.png --start \${HOURSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${HOURTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-day.png --start \${DAYSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${DAYTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-week.png --start \${WEEKSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${WEEKTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-month.png --start \${MONTHSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${MONTHTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-year.png --start \${YEARSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${YEARTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+
+EOF
+}
+
+# rrdtool script for two sensors
+f_two_sensorsrrd() {
+cat <<EOF >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+rrdtool graph \${IMGDIR}/sensors-hour.png --start \${HOURSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${HOURTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+DEF:cpuc1avg=\${DATA}/$SENSOR2:value:AVERAGE \
+DEF:cpuc1min=\${DATA}/$SENSOR2:value:MIN \
+DEF:cpuc1max=\${DATA}/$SENSOR2:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+LINE1:cpuc1avg\${COLOR_CPU_CORE_1}:"Core 2" \
+GPRINT:cpuc1min:MIN:"%4.2lf Min" \
+GPRINT:cpuc1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc1max:MAX:"%4.2lf Max" \
+GPRINT:cpuc1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-day.png --start \${DAYSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${DAYTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+DEF:cpuc1avg=\${DATA}/$SENSOR2:value:AVERAGE \
+DEF:cpuc1min=\${DATA}/$SENSOR2:value:MIN \
+DEF:cpuc1max=\${DATA}/$SENSOR2:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+LINE1:cpuc1avg\${COLOR_CPU_CORE_1}:"Core 2" \
+GPRINT:cpuc1min:MIN:"%4.2lf Min" \
+GPRINT:cpuc1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc1max:MAX:"%4.2lf Max" \
+GPRINT:cpuc1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-week.png --start \${WEEKSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${WEEKTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+DEF:cpuc1avg=\${DATA}/$SENSOR2:value:AVERAGE \
+DEF:cpuc1min=\${DATA}/$SENSOR2:value:MIN \
+DEF:cpuc1max=\${DATA}/$SENSOR2:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+LINE1:cpuc1avg\${COLOR_CPU_CORE_1}:"Core 2" \
+GPRINT:cpuc1min:MIN:"%4.2lf Min" \
+GPRINT:cpuc1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc1max:MAX:"%4.2lf Max" \
+GPRINT:cpuc1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-month.png --start \${MONTHSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${MONTHTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+DEF:cpuc1avg=\${DATA}/$SENSOR2:value:AVERAGE \
+DEF:cpuc1min=\${DATA}/$SENSOR2:value:MIN \
+DEF:cpuc1max=\${DATA}/$SENSOR2:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+LINE1:cpuc1avg\${COLOR_CPU_CORE_1}:"Core 2" \
+GPRINT:cpuc1min:MIN:"%4.2lf Min" \
+GPRINT:cpuc1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc1max:MAX:"%4.2lf Max" \
+GPRINT:cpuc1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+rrdtool graph \${IMGDIR}/sensors-year.png --start \${YEARSTART} \${DEFAULTS} --title "\${TITLE_LOAD}\${YEARTITLE}" --slope-mode --upper-limit 80 --lower-limit 0 --units-exponent 0 \
+DEF:cpuc0avg=\${DATA}/$SENSOR1:value:AVERAGE \
+DEF:cpuc0min=\${DATA}/$SENSOR1:value:MIN \
+DEF:cpuc0max=\${DATA}/$SENSOR1:value:MAX \
+DEF:cpuc1avg=\${DATA}/$SENSOR2:value:AVERAGE \
+DEF:cpuc1min=\${DATA}/$SENSOR2:value:MIN \
+DEF:cpuc1max=\${DATA}/$SENSOR2:value:MAX \
+LINE1:cpuc0avg\${COLOR_CPU_CORE_0}:"Core 1" \
+GPRINT:cpuc0min:MIN:"%4.2lf Min" \
+GPRINT:cpuc0avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc0max:MAX:"%4.2lf Max" \
+GPRINT:cpuc0avg:LAST:"%4.2lf Last\l" \
+LINE1:cpuc1avg\${COLOR_CPU_CORE_1}:"Core 2" \
+GPRINT:cpuc1min:MIN:"%4.2lf Min" \
+GPRINT:cpuc1avg:AVERAGE:"%4.2lf Avg" \
+GPRINT:cpuc1max:MAX:"%4.2lf Max" \
+GPRINT:cpuc1avg:LAST:"%4.2lf Last\l" \
+COMMENT:"\${LASTUPDATE}" >/dev/null
+
+EOF
+}
+
+######################################################################
+# Main body of script
+######################################################################
+
+# Remove existing js-files, they are newly created later
+if [ -f "$OMV_JSFILE_CONFIGDIR/Fanspeed.js" ]; then
+	rm "$OMV_JSFILE_CONFIGDIR/Fanspeed.js" > /dev/null 2>&1
+fi
+if [ -f "$OMV_JSFILE_CONFIGDIR/Sensors.js" ]; then
+	rm "$OMV_JSFILE_CONFIGDIR/Sensors.js" > /dev/null 2>&1
+fi
+sed -i /LoadPlugin\ sensors/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
+sed -i /LoadPlugin\ fanspeed/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
+
+
+# Deletes the existing section of the sensors-script
+sed -i '/#\ <<<\ \[openmediavault\]\ sensors-script/,/#\ >>>\ \[openmediavault\]\ sensors-script/d' $OMV_COLLECTD_RRDTOOL_MKGRAPH
+
+# begin new sensor-section in omv-mkgraph
+f_begin_section
+
+# Checking config-file
+# The config-file is /etc/omv-sensor.conf
+if [ -f /etc/omv-sensor.conf ]; then
+	. /etc/omv-sensor.conf
+else
+	_log "WARN: /etc/omv-sensor.conf not found - exiting"
+	f_end_section
+	exit 1
+fi
+
+# Checking config
+[[ "$pluginconf" =~ ^([1-4])$ ]] || {
+			_log "WARN: Invalid parameter format: pluginconf"
+			_log "WARN: You set it to '$pluginconf', which is not a correct syntax. Only '1' - '4' is allowed."
+			_log "WARN: Setting pluginconf to 1 - one sensor, no fanspeed"
+			pluginconf="1"; }
+
+[[ -f /var/lib/collectd/rrd/localhost/$SENSOR1 ]] || {
+	_log "WARN: given rrd-file in /var/lib/collectd/rrd/localhost for SENSOR1 does not exist"
+	_log "WARN: You set it to $SENSOR1"
+	_log "WARN: Pleast check your config-file"
+	_log "WARN: exiting script ..."
+	f_end_section
+	exit 1
+	}
+
+if [ ! -z "$SENSOR2" ]; then
+	[[ -f /var/lib/collectd/rrd/localhost/$SENSOR2 ]] || {
+	_log "WARN: given rrd-file in /var/lib/collectd/rrd/localhost for SENSOR2 does not exist"
+	_log "WARN: You set it to $SENSOR2"
+	_log "WARN: Pleast check your config-file"
+	_log "WARN: exiting script ..."
+	f_end_section
+	exit 1
+	}
+fi
+
+if [ ! -z "$FANSPEED" ]; then
+	[[ -f /var/lib/collectd/rrd/localhost/$FANSPEED ]] || {
+	_log "WARN: given rrd-file in /var/lib/collectd/rrd/localhost for FANSPEED does not exist"
+	_log "WARN: You set it to $FANSPEED"
+	_log "WARN: Pleast check your config-file"
+	_log "WARN: exiting script ..."
+	f_end_section
+	exit 1
+	}
+fi
+
+# Which configuration is selected?
+case $pluginconf in
+	1)
+		echo "# config: 1 = one sensor, no fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
+		f_sensors_load
+		f_plugin_sensors_header
+		f_one_sensorrrd
+		;;
+	2)
+		echo "# config: 2 = two sensors, no fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		if [ -z "$SENSOR2" ]; then
+			_log "WARN: SENSOR2 not defined - exiting"
+			
+		else
+			cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
+			f_sensors_load
+			f_plugin_sensors_header
+			f_two_sensorsrrd
+		fi
+		;;
+	3)
+		echo "# config: 3 = one sensor and fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
+		f_sensors_load
+		f_plugin_sensors_header
+		f_one_sensorrrd
+
+		if [ -z "$FANSPEED" ]; then
+			_log "WARN: FANSPEED not defined - exiting"
+			echo "# FANSPEED not defined - exiting" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		else
+			cp "$OMV_JSFILE_CONFIGDIR/Fanspeed.default" "$OMV_JSFILE_CONFIGDIR/Fanspeed.js"
+			f_fanspeed_load
+			f_plugin_fanspeed_header
+			f_fanspeedrrd
+		fi
+		;;
+	4)
+		echo "# config: 4 = two sensors and fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		if [ -z "$SENSOR2" ]; then
+			_log "WARN: SENSOR2 not defined - exiting"
+			echo "# SENSOR2 not defined - exiting" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		else
+			cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
+			
+			f_sensors_load
+			f_plugin_sensors_header
+			f_two_sensorsrrd
+		fi
+
+		if [ -z "$FANSPEED" ]; then
+			_log "WARN: FANSPEED not defined - exiting"
+			echo "# FANSPEED not defined - exiting" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
+		else
+			cp "$OMV_JSFILE_CONFIGDIR/Fanspeed.default" "$OMV_JSFILE_CONFIGDIR/Fanspeed.js"
+			f_fanspeed_load
+			f_plugin_fanspeed_header
+			f_fanspeedrrd
+		fi
+		;;
+	*)
+		_log "INFO: This should not happen"
+		exit 1
+		;;
+esac
+
+f_end_section
+exit 0
+	

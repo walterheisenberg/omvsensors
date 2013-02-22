@@ -1,0 +1,29 @@
+/**
+ * Sensors plugin for system information.
+ */
+// require("js/omv/NavigationPanel.js")
+// require("js/omv/PluginMgr.js")
+// require("js/omv/data/DataProxy.js")
+// require("js/omv/data/Store.js")
+// require("js/omv/grid/TBarGridPanel.js")
+// require("js/omv/RrdGraphPanel.js")
+
+Ext.ns("OMV.Module.Diagnostics.SysInfo");
+
+/**
+ * @class OMV.Module.Diagnostics.SysInfo.Temperatures
+ * @derived Ext.TabPanel
+ */
+
+OMV.Module.Diagnostics.SysInfo.Temperature = function(config) {
+	var initialConfig = {
+		title: "Fanspeed",
+		rrdGraphName: "fanspeed"
+	};
+	Ext.apply(initialConfig, config);
+	OMV.Module.Diagnostics.SysInfo.Temperature.superclass.constructor.call(
+		this, initialConfig);
+};
+Ext.extend(OMV.Module.Diagnostics.SysInfo.Temperature, OMV.RrdGraphPanel, {
+});
+OMV.preg("sysinfo", "system", OMV.Module.Diagnostics.SysInfo.Temperature); 
