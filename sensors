@@ -13,7 +13,7 @@
 #                 feel free to edit this file, but please share it in
 #                 the OMV-Forum:
 #                 http://forums.openmediavault.org/viewtopic.php?f=13&t=79#p244
-#       VERSION:  0.2
+#       VERSION:  0.3
 #=======================================================================
 
 # Todo:
@@ -297,6 +297,9 @@ if [ -f "$OMV_JSFILE_CONFIGDIR/Sensors.js" ]; then
 fi
 sed -i /LoadPlugin\ sensors/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
 
+# LoadPlugin fanspeed is already part of collectd - if it exists -> remove it!
+sed -i /LoadPlugin\ fanspeed/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
+
 # Deletes the existing section of the sensors-script
 sed -i '/#\ <<<\ \[openmediavault\]\ sensors-script/,/#\ >>>\ \[openmediavault\]\ sensors-script/d' $OMV_COLLECTD_RRDTOOL_MKGRAPH
 
@@ -311,6 +314,11 @@ else
 	_log "WARN: /etc/omv-sensor.conf not found - exiting"
 	f_end_section
 	exit 1
+fi
+
+# Add "LoadPlugin sensors" to /etc/collectd/collectd.conf
+if ! egrep "^LoadPlugin sensors" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
+	echo -e "LoadPlugin sensors\n" >> ${OMV_COLLECTD_CONFIG}
 fi
 
 # Checking config
@@ -349,11 +357,6 @@ if [ ! -z "$FANSPEED" ]; then
 	f_end_section
 	exit 1
 	}
-fi
-
-# Add "LoadPlugin sensors" to /etc/collectd/collectd.conf
-if ! egrep "^LoadPlugin sensors" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
-	echo -e "LoadPlugin sensors\n\n" >> ${OMV_COLLECTD_CONFIG}
 fi
 
 # Which configuration is selected?
