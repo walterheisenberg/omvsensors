@@ -13,7 +13,7 @@
 #                 feel free to edit this file, but please share it in
 #                 the OMV-Forum:
 #                 http://forums.openmediavault.org/viewtopic.php?f=13&t=79#p244
-#       VERSION:  0.1
+#       VERSION:  0.2
 #=======================================================================
 
 # Todo:
@@ -51,21 +51,6 @@ f_begin_section() {
 f_end_section() {
 	echo "# >>> [openmediavault] sensors-script" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
 }
-
-# Add "LoadPlugin sensors" to /etc/collectd/collectd.conf
-f_sensors_load() {
-	if ! egrep "^LoadPlugin sensors" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
-		echo -e "LoadPlugin sensors\n\n" >> ${OMV_COLLECTD_CONFIG}
-	fi
-}
-
-# Add "LoadPlugin fanspeed" to /etc/collectd/collectd.conf
-f_fanspeed_load() {
-	if ! egrep "^LoadPlugin fanspeed" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
-		echo -e "LoadPlugin fanspeed\n\n" >> ${OMV_COLLECTD_CONFIG}
-	fi
-}
-
 
 # hedader for sensors section in /usr/sbin/omv-mkgraph
 f_plugin_sensors_header() {
@@ -311,8 +296,6 @@ if [ -f "$OMV_JSFILE_CONFIGDIR/Sensors.js" ]; then
 	rm "$OMV_JSFILE_CONFIGDIR/Sensors.js" > /dev/null 2>&1
 fi
 sed -i /LoadPlugin\ sensors/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
-sed -i /LoadPlugin\ fanspeed/d ${OMV_COLLECTD_CONFIG} 2> /dev/null
-
 
 # Deletes the existing section of the sensors-script
 sed -i '/#\ <<<\ \[openmediavault\]\ sensors-script/,/#\ >>>\ \[openmediavault\]\ sensors-script/d' $OMV_COLLECTD_RRDTOOL_MKGRAPH
@@ -368,12 +351,16 @@ if [ ! -z "$FANSPEED" ]; then
 	}
 fi
 
+# Add "LoadPlugin sensors" to /etc/collectd/collectd.conf
+if ! egrep "^LoadPlugin sensors" ${OMV_COLLECTD_CONFIG} 2> /dev/null; then
+	echo -e "LoadPlugin sensors\n\n" >> ${OMV_COLLECTD_CONFIG}
+fi
+
 # Which configuration is selected?
 case $pluginconf in
 	1)
 		echo "# config: 1 = one sensor, no fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
 		cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
-		f_sensors_load
 		f_plugin_sensors_header
 		f_one_sensorrrd
 		;;
@@ -384,7 +371,6 @@ case $pluginconf in
 			
 		else
 			cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
-			f_sensors_load
 			f_plugin_sensors_header
 			f_two_sensorsrrd
 		fi
@@ -392,7 +378,6 @@ case $pluginconf in
 	3)
 		echo "# config: 3 = one sensor and fanspeed" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
 		cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
-		f_sensors_load
 		f_plugin_sensors_header
 		f_one_sensorrrd
 
@@ -401,7 +386,6 @@ case $pluginconf in
 			echo "# FANSPEED not defined - exiting" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
 		else
 			cp "$OMV_JSFILE_CONFIGDIR/Fanspeed.default" "$OMV_JSFILE_CONFIGDIR/Fanspeed.js"
-			f_fanspeed_load
 			f_plugin_fanspeed_header
 			f_fanspeedrrd
 		fi
@@ -414,7 +398,6 @@ case $pluginconf in
 		else
 			cp "$OMV_JSFILE_CONFIGDIR/Sensors.default" "$OMV_JSFILE_CONFIGDIR/Sensors.js"
 			
-			f_sensors_load
 			f_plugin_sensors_header
 			f_two_sensorsrrd
 		fi
@@ -424,7 +407,6 @@ case $pluginconf in
 			echo "# FANSPEED not defined - exiting" >> ${OMV_COLLECTD_RRDTOOL_MKGRAPH}
 		else
 			cp "$OMV_JSFILE_CONFIGDIR/Fanspeed.default" "$OMV_JSFILE_CONFIGDIR/Fanspeed.js"
-			f_fanspeed_load
 			f_plugin_fanspeed_header
 			f_fanspeedrrd
 		fi
@@ -437,4 +419,3 @@ esac
 
 f_end_section
 exit 0
-	
